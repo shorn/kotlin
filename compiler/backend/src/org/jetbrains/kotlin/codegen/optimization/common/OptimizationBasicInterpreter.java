@@ -26,10 +26,10 @@ import org.jetbrains.org.objectweb.asm.tree.analysis.BasicInterpreter;
 import org.jetbrains.org.objectweb.asm.tree.analysis.BasicValue;
 
 public class OptimizationBasicInterpreter extends BasicInterpreter {
-    private static final BasicValue BOOLEAN_VALUE = new BasicValue(Type.BOOLEAN_TYPE);
-    private static final BasicValue CHAR_VALUE = new BasicValue(Type.CHAR_TYPE);
-    private static final BasicValue BYTE_VALUE = new BasicValue(Type.BYTE_TYPE);
-    private static final BasicValue SHORT_VALUE = new BasicValue(Type.SHORT_TYPE);
+    protected static final BasicValue BOOLEAN_VALUE = new BasicValue(Type.BOOLEAN_TYPE);
+    protected static final BasicValue CHAR_VALUE = new BasicValue(Type.CHAR_TYPE);
+    protected static final BasicValue BYTE_VALUE = new BasicValue(Type.BYTE_TYPE);
+    protected static final BasicValue SHORT_VALUE = new BasicValue(Type.SHORT_TYPE);
 
     @Override
     @Nullable

@@ -191,7 +191,7 @@ class CoroutineTransformerMethodVisitor(
 
     private fun spillVariables(suspensionPoints: List<SuspensionPoint>, methodNode: MethodNode) {
         val instructions = methodNode.instructions
-        val frames = MethodTransformer.analyze(classBuilder.thisName, methodNode, OptimizationBasicInterpreter())
+        val frames = performRefinedTypeAnalysis(methodNode, classBuilder.thisName)
         fun AbstractInsnNode.index() = instructions.indexOf(this)
 
         // We postpone these actions because they change instruction indices that we use when obtaining frames

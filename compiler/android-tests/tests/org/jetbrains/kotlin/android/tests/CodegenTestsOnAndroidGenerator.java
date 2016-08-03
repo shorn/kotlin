@@ -231,6 +231,9 @@ public class CodegenTestsOnAndroidGenerator extends KtUsefulTestCase {
             if (SpecialFiles.getExcludedFiles().contains(file.getName())) {
                 continue;
             }
+
+            if (!file.isDirectory() && !file.getName().contains("booleanVarSpill")) continue;
+
             if (file.isDirectory()) {
                 File[] listFiles = file.listFiles();
                 if (listFiles != null) {
