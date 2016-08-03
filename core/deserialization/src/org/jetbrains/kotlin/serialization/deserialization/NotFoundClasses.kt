@@ -58,11 +58,10 @@ class NotFoundClasses(private val storageManager: StorageManager, private val mo
         })
     }
 
-    // TODO: Uncomment this when KT-12871 is fixed
-    // private typealias ConstructorFunction<D> = (DeclarationDescriptor, Name, isInner: Boolean, numberOfTypeParametersCount: Int) -> D
+    private typealias ClassifierDescriptorFactory<D> = (DeclarationDescriptor, Name, isInner: Boolean, numberOfTypeParametersCount: Int) -> D
     private fun <D> computeClassifier(
             request: ClassRequest,
-            constructor: (DeclarationDescriptor, Name, isInner: Boolean, numberOfTypeParametersCount: Int) -> D
+            factory: ClassifierDescriptorFactory<D>
     ): D {
         val (classId, typeParametersCount) = request
 
@@ -77,7 +76,7 @@ class NotFoundClasses(private val storageManager: StorageManager, private val mo
         // Treat a class with a nested ClassId as inner for simplicity, otherwise the outer type cannot have generic arguments
         val isInner = classId.isNestedClass
 
-        return constructor(container, classId.shortClassName, isInner, typeParametersCount.firstOrNull() ?: 0)
+        return factory(container, classId.shortClassName, isInner, typeParametersCount.firstOrNull() ?: 0)
     }
 
     class MockClassDescriptor internal constructor(
