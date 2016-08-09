@@ -101,14 +101,8 @@ public abstract class StackValue {
         put(type, v);
     }
 
-    public void put(@NotNull Type type, @NotNull InstructionAdapter v) {
-        put(type, v, false);
-    }
-
-    public void put(@NotNull Type type, @NotNull InstructionAdapter v, boolean skipReceiver) {
-        if (!skipReceiver) {
-            putReceiver(v, true);
-        }
+    public final void put(@NotNull Type type, @NotNull InstructionAdapter v) {
+        putReceiver(v, true);
         putSelector(type, v);
     }
 
@@ -119,7 +113,11 @@ public abstract class StackValue {
     }
 
 
-    public void putReceiver(@NotNull InstructionAdapter v, boolean isRead) {
+    public final void putReceiver(@NotNull InstructionAdapter v, boolean isRead) {
+        putReceiverForSeveralOperations(v, isRead);
+    }
+
+    public void putReceiverForSeveralOperations(@NotNull InstructionAdapter v, boolean... isReadOperation) {
         //by default there is no receiver
         //if you have it inherit StackValueWithSimpleReceiver
     }
@@ -731,6 +729,13 @@ public abstract class StackValue {
             codegen.tempVariables.remove(arguments.get(1).asElement());
             codegen.tempVariables.remove(arguments.get(2).asElement());
         }
+
+        @Override
+        public void putReceiverForSeveralOperations(@NotNull InstructionAdapter v, boolean... isReadOperation) {
+            if (isReadOperation.length > 1) {
+                throwUnsupportedComplexOperation(variableDescriptor);
+            }
+        }
     }
 
     private static class OnStack extends StackValue {
@@ -909,10 +914,6 @@ public abstract class StackValue {
 
         @Override
         public void dup(@NotNull InstructionAdapter v, boolean withReceiver) {
-            dupReceiver(v);
-        }
-
-        private void dupReceiver(@NotNull InstructionAdapter v) {
             if (CollectionElement.isStandardStack(codegen.typeMapper, resolvedGetCall, 1) &&
                 CollectionElement.isStandardStack(codegen.typeMapper, resolvedSetCall, 2)) {
                 v.dup2();   // collection and index
@@ -1126,6 +1127,15 @@ public abstract class StackValue {
                 pop(v, returnType);
             }
         }
+
+        @Override
+        public void putReceiverForSeveralOperations(@NotNull InstructionAdapter v, boolean... isReadOperations) {
+            if (isReadOperations.length > 1) {
+                // TODO: inline-related magic
+                ((CollectionElementReceiver) receiver).isComplexOperationWithDup = true;
+            }
+            super.putReceiverForSeveralOperations(v, isReadOperations);
+        }
     }
 
 
@@ -1295,6 +1305,16 @@ public abstract class StackValue {
                     pop(v, returnType);
                 }
             }
+        }
+
+        @Override
+        public void putReceiverForSeveralOperations(@NotNull InstructionAdapter v, boolean... isReadOperations) {
+            if (isReadOperations.length > 1 && resolvedCall != null &&
+                resolvedCall.getResultingDescriptor() instanceof PropertyDescriptor &&
+                InlineUtil.hasInlineAccessors((PropertyDescriptor) resolvedCall.getResultingDescriptor())) {
+                throwUnsupportedComplexOperation(resolvedCall.getResultingDescriptor());
+            }
+            super.putReceiverForSeveralOperations(v, isReadOperations);
         }
 
         private static boolean isStatic(boolean isStaticBackingField, @Nullable CallableMethod callable) {
@@ -1500,12 +1520,12 @@ public abstract class StackValue {
 
         @Override
         public void putSelector(@NotNull Type type, @NotNull InstructionAdapter v) {
-            value = StackValue.complexReceiver(value, true, false, true);
-            value.put(this.type, v);
+            value.putReceiverForSeveralOperations(v, true, false, true);
+            value.putSelector(this.type, v);
 
             value.store(codegen.invokeFunction(resolvedCall, StackValue.onStack(this.type)), v, true);
 
-            value.put(this.type, v, true);
+            value.putSelector(this.type, v);
             coerceTo(type, v);
         }
     }
@@ -1617,10 +1637,32 @@ public abstract class StackValue {
         }
 
         @Override
-        public void putReceiver(@NotNull InstructionAdapter v, boolean isRead) {
-            boolean hasReceiver = isNonStaticAccess(isRead);
-            if (hasReceiver || receiver.canHaveSideEffects()) {
-                receiver.put(hasReceiver ? receiver.type : Type.VOID_TYPE, v);
+        public void putReceiverForSeveralOperations(@NotNull InstructionAdapter v, boolean... isReadOperations) {
+            // For sake of optimizations
+            if (isReadOperations.length == 1) {
+                boolean hasReceiver = isNonStaticAccess(isReadOperations[0]);
+                if (hasReceiver || receiver.canHaveSideEffects()) {
+                    receiver.put(hasReceiver ? receiver.type : Type.VOID_TYPE, v);
+                }
+
+                return;
+            }
+
+            boolean wasPut = false;
+            for (boolean operation : isReadOperations) {
+                if (isNonStaticAccess(operation)) {
+                    if (!wasPut) {
+                        receiver.put(receiver.type, v);
+                        wasPut = true;
+                    }
+                    else {
+                        receiver.dup(v, false);
+                    }
+                }
+            }
+
+            if (!wasPut && receiver.canHaveSideEffects()) {
+                receiver.put(Type.VOID_TYPE, v);
             }
         }
 
@@ -1685,46 +1727,6 @@ public abstract class StackValue {
         }
     }
 
-    private static class ComplexReceiver extends StackValue {
-
-        private final StackValueWithSimpleReceiver originalValueWithReceiver;
-        private final boolean[] isReadOperations;
-
-        public ComplexReceiver(StackValueWithSimpleReceiver value, boolean[] isReadOperations) {
-            super(value.type, value.receiver.canHaveSideEffects());
-            this.originalValueWithReceiver = value;
-            this.isReadOperations = isReadOperations;
-            if (value instanceof CollectionElement) {
-                if (value.receiver instanceof CollectionElementReceiver) {
-                    ((CollectionElementReceiver) value.receiver).isComplexOperationWithDup = true;
-                }
-            }
-        }
-
-        @Override
-        public void putSelector(
-                @NotNull Type type, @NotNull InstructionAdapter v
-        ) {
-            boolean wasPut = false;
-            StackValue receiver = originalValueWithReceiver.receiver;
-            for (boolean operation : isReadOperations) {
-                if (originalValueWithReceiver.isNonStaticAccess(operation)) {
-                    if (!wasPut) {
-                        receiver.put(receiver.type, v);
-                        wasPut = true;
-                    }
-                    else {
-                        receiver.dup(v, false);
-                    }
-                }
-            }
-
-            if (!wasPut && receiver.canHaveSideEffects()) {
-                receiver.put(Type.VOID_TYPE, v);
-            }
-        }
-    }
-
     public static class Receiver extends StackValue {
 
         private final StackValue[] instructions;
@@ -1741,71 +1743,6 @@ public abstract class StackValue {
             for (StackValue instruction : instructions) {
                 instruction.put(instruction.type, v);
             }
-        }
-    }
-
-    public static class DelegatedForComplexReceiver extends StackValueWithSimpleReceiver {
-
-        public final StackValueWithSimpleReceiver originalValue;
-
-        public DelegatedForComplexReceiver(
-                @NotNull Type type,
-                @NotNull StackValueWithSimpleReceiver originalValue,
-                @NotNull ComplexReceiver receiver
-        ) {
-            super(type, bothReceiverStatic(originalValue), bothReceiverStatic(originalValue), receiver, originalValue.canHaveSideEffects());
-            this.originalValue = originalValue;
-        }
-
-        private static boolean bothReceiverStatic(StackValueWithSimpleReceiver originalValue) {
-            return !(originalValue.isNonStaticAccess(true) || originalValue.isNonStaticAccess(false));
-        }
-
-        @Override
-        public void putSelector(
-                @NotNull Type type, @NotNull InstructionAdapter v
-        ) {
-            originalValue.putSelector(type, v);
-        }
-
-        @Override
-        public void storeSelector(
-                @NotNull Type topOfStackType, @NotNull InstructionAdapter v
-        ) {
-            originalValue.storeSelector(topOfStackType, v);
-        }
-
-        @Override
-        public void dup(@NotNull InstructionAdapter v, boolean withWriteReceiver) {
-            originalValue.dup(v, withWriteReceiver);
-        }
-    }
-
-    public static StackValue complexWriteReadReceiver(StackValue stackValue) {
-        return complexReceiver(stackValue, false, true);
-    }
-
-    private static StackValue complexReceiver(StackValue stackValue, boolean... isReadOperations) {
-        if (stackValue instanceof Property) {
-            ResolvedCall resolvedCall = ((Property) stackValue).resolvedCall;
-            if (resolvedCall != null &&
-                resolvedCall.getResultingDescriptor() instanceof PropertyDescriptor &&
-                InlineUtil.hasInlineAccessors((PropertyDescriptor) resolvedCall.getResultingDescriptor())) {
-                //TODO need to support
-                throwUnsupportedComplexOperation(resolvedCall.getResultingDescriptor());
-            }
-        }
-        else if (stackValue instanceof Delegate) {
-            //TODO need to support
-            throwUnsupportedComplexOperation(((Delegate) stackValue).variableDescriptor);
-        }
-
-        if (stackValue instanceof StackValueWithSimpleReceiver) {
-            return new DelegatedForComplexReceiver(stackValue.type, (StackValueWithSimpleReceiver) stackValue,
-                                 new ComplexReceiver((StackValueWithSimpleReceiver) stackValue, isReadOperations));
-        }
-        else {
-            return stackValue;
         }
     }
 

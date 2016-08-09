@@ -34,8 +34,8 @@ class CoercionValue(
         value.storeSelector(topOfStackType, v)
     }
 
-    override fun putReceiver(v: InstructionAdapter, isRead: Boolean) {
-        value.putReceiver(v, isRead)
+    override fun putReceiverForSeveralOperations(v: InstructionAdapter, vararg isReadOperation: Boolean) {
+        value.putReceiverForSeveralOperations(v, *isReadOperation)
     }
 
     override fun isNonStaticAccess(isRead: Boolean): Boolean {
@@ -49,8 +49,8 @@ class StackValueWithLeaveTask(
         val leaveTasks: (StackValue) -> Unit
 ) : StackValue(stackValue.type) {
 
-    override fun putReceiver(v: InstructionAdapter, isRead: Boolean) {
-        stackValue.putReceiver(v, isRead)
+    override fun putReceiverForSeveralOperations(v: InstructionAdapter, vararg isReadOperation: Boolean) {
+        stackValue.putReceiverForSeveralOperations(v, *isReadOperation)
     }
 
     override fun putSelector(type: Type, v: InstructionAdapter) {

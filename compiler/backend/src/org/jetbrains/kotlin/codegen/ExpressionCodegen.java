@@ -3631,9 +3631,13 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
     ) {
         StackValue value = gen(expression.getLeft());
         if (keepReturnValue) {
-            value = StackValue.complexWriteReadReceiver(value);
+            value.putReceiverForSeveralOperations(v, false, true);
         }
-        value.put(lhsType, v);
+        else {
+            value.putReceiver(v, true);
+        }
+
+        value.putSelector(lhsType, v);
         StackValue receiver = StackValue.onStack(lhsType);
 
         callable.invokeMethodWithArguments(resolvedCall, receiver, this).put(callable.getReturnType(), v);
@@ -3771,9 +3775,11 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         return StackValue.operation(asmBaseType, new Function1<InstructionAdapter, Unit>() {
             @Override
             public Unit invoke(InstructionAdapter v) {
-                StackValue value = StackValue.complexWriteReadReceiver(gen(expression.getBaseExpression()));
+                StackValue value = gen(expression.getBaseExpression());
 
-                value.put(asmBaseType, v);
+                value.putReceiverForSeveralOperations(v, false, true);
+                value.putSelector(asmBaseType, v);
+
                 AsmUtil.dup(v, asmBaseType);
 
                 StackValue previousValue = StackValue.local(myFrameMap.enterTemp(asmBaseType), asmBaseType);
