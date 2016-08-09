@@ -1611,7 +1611,35 @@ public abstract class StackValue {
 
         @Override
         public void dup(@NotNull InstructionAdapter v, boolean withReceiver) {
-            AsmUtil.dup(v, extensionReceiver.type, dispatchReceiver.type);
+            if (extensionReceiver.type.getSize() == 0 && dispatchReceiver.type.getSize() == 0) {
+                return;
+            }
+
+            if (extensionReceiver.type.getSize() == 0) {
+                AsmUtil.dup(v, dispatchReceiver.type);
+            }
+            else if (dispatchReceiver.type.getSize() == 0) {
+                AsmUtil.dup(v, extensionReceiver.type);
+            }
+            else if (dispatchReceiver.type.getSize() == 1) {
+                if (extensionReceiver.type.getSize() == 1) {
+                    AsmUtil.dup(v, 2);
+                }
+                else {
+                    v.dup2X1();
+                    v.pop2();
+                    v.dupX2();
+                    v.dupX2();
+                    v.pop();
+                    v.dup2X1();
+                }
+            }
+            else {
+                //Note: it's possible to write dup3 and dup4
+                throw new UnsupportedOperationException("Don't know how generate dup3/dup4 for: " +
+                                                        extensionReceiver.type + " and " +
+                                                        dispatchReceiver.type);
+            }
         }
     }
 

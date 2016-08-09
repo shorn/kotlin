@@ -638,7 +638,7 @@ public class AsmUtil {
     ) {
         KotlinType type = parameter.getReturnType();
         if (type == null || isNullableType(type)) return;
-        
+
         int index = frameMap.getIndex(parameter);
         Type asmType = typeMapper.mapType(type);
         if (asmType.getSort() == Type.OBJECT || asmType.getSort() == Type.ARRAY) {
@@ -758,7 +758,7 @@ public class AsmUtil {
         dup(v, type.getSize());
     }
 
-    private static void dup(@NotNull InstructionAdapter v, int size) {
+    public static void dup(@NotNull InstructionAdapter v, int size) {
         if (size == 2) {
             v.dup2();
         }
@@ -767,36 +767,6 @@ public class AsmUtil {
         }
         else {
             throw new UnsupportedOperationException();
-        }
-    }
-
-    public static void dup(@NotNull InstructionAdapter v, @NotNull Type topOfStack, @NotNull Type afterTop) {
-        if (topOfStack.getSize() == 0 && afterTop.getSize() == 0) {
-            return;
-        }
-
-        if (topOfStack.getSize() == 0) {
-            dup(v, afterTop);
-        }
-        else if (afterTop.getSize() == 0) {
-            dup(v, topOfStack);
-        }
-        else if (afterTop.getSize() == 1) {
-            if (topOfStack.getSize() == 1) {
-                dup(v, 2);
-            }
-            else {
-                v.dup2X1();
-                v.pop2();
-                v.dupX2();
-                v.dupX2();
-                v.pop();
-                v.dup2X1();
-            }
-        }
-        else {
-            //Note: it's possible to write dup3 and dup4
-            throw new UnsupportedOperationException("Don't know how generate dup3/dup4 for: " + topOfStack + " and " + afterTop);
         }
     }
 
