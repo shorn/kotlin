@@ -122,7 +122,7 @@ public abstract class StackValue {
         //if you have it inherit StackValueWithSimpleReceiver
     }
 
-    public void dup(@NotNull InstructionAdapter v, boolean withReceiver) {
+    protected void dup(@NotNull InstructionAdapter v) {
         if (!Type.VOID_TYPE.equals(type)) {
             AsmUtil.dup(v, type);
         }
@@ -913,7 +913,7 @@ public abstract class StackValue {
         }
 
         @Override
-        public void dup(@NotNull InstructionAdapter v, boolean withReceiver) {
+        protected void dup(@NotNull InstructionAdapter v) {
             if (CollectionElement.isStandardStack(codegen.typeMapper, resolvedGetCall, 1) &&
                 CollectionElement.isStandardStack(codegen.typeMapper, resolvedSetCall, 2)) {
                 v.dup2();   // collection and index
@@ -1610,7 +1610,7 @@ public abstract class StackValue {
         }
 
         @Override
-        public void dup(@NotNull InstructionAdapter v, boolean withReceiver) {
+        protected void dup(@NotNull InstructionAdapter v) {
             if (extensionReceiver.type.getSize() == 0 && dispatchReceiver.type.getSize() == 0) {
                 return;
             }
@@ -1684,7 +1684,7 @@ public abstract class StackValue {
                         wasPut = true;
                     }
                     else {
-                        receiver.dup(v, false);
+                        receiver.dup(v);
                     }
                 }
             }
@@ -1699,44 +1699,9 @@ public abstract class StackValue {
             return isRead ? !isStaticPut : !isStaticStore;
         }
 
-        public int receiverSize() {
-            return receiver.type.getSize();
-        }
-
         @Override
-        public void dup(@NotNull InstructionAdapter v, boolean withWriteReceiver) {
-            if (!withWriteReceiver) {
-                super.dup(v, false);
-            }
-            else {
-                int receiverSize = isNonStaticAccess(false) ? receiverSize() : 0;
-                switch (receiverSize) {
-                    case 0:
-                        AsmUtil.dup(v, type);
-                        break;
-
-                    case 1:
-                        if (type.getSize() == 2) {
-                            v.dup2X1();
-                        }
-                        else {
-                            v.dupX1();
-                        }
-                        break;
-
-                    case 2:
-                        if (type.getSize() == 2) {
-                            v.dup2X2();
-                        }
-                        else {
-                            v.dupX2();
-                        }
-                        break;
-
-                    case -1:
-                        throw new UnsupportedOperationException();
-                }
-            }
+        protected int receiverSize() {
+            return receiver.type.getSize();
         }
 
         @Override
