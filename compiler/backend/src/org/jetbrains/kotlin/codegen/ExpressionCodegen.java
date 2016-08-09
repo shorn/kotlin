@@ -3739,7 +3739,7 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         }
 
 
-        final Type asmResultType = expressionType(expression);
+        Type asmResultType = expressionType(expression);
         final Type asmBaseType = expressionType(expression.getBaseExpression());
 
         DeclarationDescriptor cls = op.getContainingDeclaration();

@@ -482,7 +482,7 @@ public abstract class StackValue {
         return new PostIncrement(index, increment);
     }
 
-    public static StackValue preIncrementForLocalVar(int index, int increment) {
+    private static StackValue preIncrementForLocalVar(int index, int increment) {
         return new PreIncrementForLocalVar(index, increment);
     }
 
@@ -733,7 +733,7 @@ public abstract class StackValue {
         }
     }
 
-    public static class OnStack extends StackValue {
+    private static class OnStack extends StackValue {
         public OnStack(Type type) {
             super(type);
         }
@@ -912,7 +912,7 @@ public abstract class StackValue {
             dupReceiver(v);
         }
 
-        public void dupReceiver(@NotNull InstructionAdapter v) {
+        private void dupReceiver(@NotNull InstructionAdapter v) {
             if (CollectionElement.isStandardStack(codegen.typeMapper, resolvedGetCall, 1) &&
                 CollectionElement.isStandardStack(codegen.typeMapper, resolvedSetCall, 2)) {
                 v.dup2();   // collection and index
@@ -1003,7 +1003,7 @@ public abstract class StackValue {
         }
     }
 
-    public static class CollectionElement extends StackValueWithSimpleReceiver {
+    private static class CollectionElement extends StackValueWithSimpleReceiver {
         private final Callable getter;
         private final Callable setter;
         private final ExpressionCodegen codegen;
@@ -1484,7 +1484,7 @@ public abstract class StackValue {
     private static class PrefixIncrement extends StackValue {
         private final ResolvedCall resolvedCall;
         private final ExpressionCodegen codegen;
-        private StackValue value;
+        private final StackValue value;
 
         public PrefixIncrement(
                 @NotNull Type type,
@@ -1510,7 +1510,7 @@ public abstract class StackValue {
         }
     }
 
-    public static class CallReceiver extends StackValue {
+    private static class CallReceiver extends StackValue {
         private final StackValue dispatchReceiver;
         private final StackValue extensionReceiver;
 
