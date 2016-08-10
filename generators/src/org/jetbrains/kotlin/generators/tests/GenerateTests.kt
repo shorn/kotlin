@@ -228,6 +228,10 @@ fun main(args: Array<String>) {
             model("codegen/bytecodeText")
         }
 
+        testClass<AbstractFullBytecodeTextTest>() {
+            model("codegen/fullBytecodeText")
+        }
+
         testClass<AbstractBytecodeListingTest>() {
             model("codegen/bytecodeListing")
         }

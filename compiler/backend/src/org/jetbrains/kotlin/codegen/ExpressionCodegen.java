@@ -3780,10 +3780,21 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
                 value.putReceiverForSeveralOperations(v, false, true);
                 value.putSelector(asmBaseType, v);
 
-                AsmUtil.dup(v, asmBaseType);
+                // Try not to use additional var for storing previous value like javac does.
+                // Current stack state: receiver, selector
+                // If possible copy selector below the receiver: selector, receiver, selector
+                // In case of success there will be previous value on the stack after store call
+                //
+                // NB: Beside optimization it's also necessary to help DEX generate valid code (we just repeat after javac)
+                // see KT-13098
+                boolean isThereValueBelowReceiver = value.dupSelectorBelowReceiverForWrite(asmBaseType, v);
 
-                StackValue previousValue = StackValue.local(myFrameMap.enterTemp(asmBaseType), asmBaseType);
-                previousValue.store(StackValue.onStack(asmBaseType), v);
+                StackValue previousValue = null;
+                if (!isThereValueBelowReceiver) {
+                    AsmUtil.dup(v, asmBaseType);
+                    previousValue = StackValue.local(myFrameMap.enterTemp(asmBaseType), asmBaseType);
+                    previousValue.store(StackValue.onStack(asmBaseType), v);
+                }
 
                 Type storeType;
                 if (isPrimitiveNumberClassDescriptor && AsmUtil.isPrimitive(asmBaseType)) {
@@ -3798,9 +3809,10 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
 
                 value.store(StackValue.onStack(storeType), v, true);
 
-                previousValue.put(asmBaseType, v);
-
-                myFrameMap.leaveTemp(asmBaseType);
+                if (!isThereValueBelowReceiver) {
+                    previousValue.put(asmBaseType, v);
+                    myFrameMap.leaveTemp(asmBaseType);
+                }
 
                 return Unit.INSTANCE;
             }

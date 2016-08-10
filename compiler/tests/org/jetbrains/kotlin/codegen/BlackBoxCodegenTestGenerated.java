@@ -7384,6 +7384,12 @@ public class BlackBoxCodegenTestGenerated extends AbstractBlackBoxCodegenTest {
             doTest(fileName);
         }
 
+        @TestMetadata("postfixIncrementComplicatedReceiver.kt")
+        public void testPostfixIncrementComplicatedReceiver() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/increment/postfixIncrementComplicatedReceiver.kt");
+            doTest(fileName);
+        }
+
         @TestMetadata("postfixIncrementDoubleSmartCast.kt")
         public void testPostfixIncrementDoubleSmartCast() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/increment/postfixIncrementDoubleSmartCast.kt");
@@ -7411,6 +7417,30 @@ public class BlackBoxCodegenTestGenerated extends AbstractBlackBoxCodegenTest {
         @TestMetadata("postfixIncrementOnSmartCast.kt")
         public void testPostfixIncrementOnSmartCast() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/increment/postfixIncrementOnSmartCast.kt");
+            doTest(fileName);
+        }
+
+        @TestMetadata("postfixIncrementOptimized.kt")
+        public void testPostfixIncrementOptimized() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/increment/postfixIncrementOptimized.kt");
+            doTest(fileName);
+        }
+
+        @TestMetadata("postfixIncrementOptimizedArray.kt")
+        public void testPostfixIncrementOptimizedArray() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/increment/postfixIncrementOptimizedArray.kt");
+            doTest(fileName);
+        }
+
+        @TestMetadata("postfixIncrementOptimizedArrayLong.kt")
+        public void testPostfixIncrementOptimizedArrayLong() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/increment/postfixIncrementOptimizedArrayLong.kt");
+            doTest(fileName);
+        }
+
+        @TestMetadata("postfixIncrementOptimizedLong.kt")
+        public void testPostfixIncrementOptimizedLong() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/increment/postfixIncrementOptimizedLong.kt");
             doTest(fileName);
         }
 

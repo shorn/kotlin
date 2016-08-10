@@ -112,6 +112,57 @@ public abstract class StackValue {
         return false;
     }
 
+    /**
+     * This method change stack contents like dupX1 (but for different value sizes):
+     * receiverValue, value -> value, receiverValue, value
+     *
+     * @return false if receiver size is more than 2 or unknown (see {@link CollectionElement})
+     */
+    public final boolean dupSelectorBelowReceiverForWrite(
+            @NotNull Type selectorType,
+            @NotNull InstructionAdapter v
+    ) {
+        int receiverSize = isNonStaticAccess(false) ? receiverSizeForWrite() : 0;
+        switch (receiverSize) {
+            case 0:
+                AsmUtil.dup(v, selectorType);
+                break;
+
+            case 1:
+                if (selectorType.getSize() == 2) {
+                    v.dup2X1();
+                }
+                else {
+                    v.dupX1();
+                }
+                break;
+
+            case 2:
+                if (selectorType.getSize() == 2) {
+                    v.dup2X2();
+                }
+                else {
+                    v.dupX2();
+                }
+                break;
+
+            case -1:
+                return false;
+
+            default:
+                throw new IllegalStateException("Unexpected receiver size: " + receiverSize);
+        }
+
+        return true;
+    }
+
+    /**
+     * @return -1 if receiver size is more than 2 or unknown
+     */
+    protected int receiverSizeForWrite() {
+        // It's safe to suppose that receiver size is unknown in general
+        return -1;
+    }
 
     public final void putReceiver(@NotNull InstructionAdapter v, boolean isRead) {
         putReceiverForSeveralOperations(v, isRead);
@@ -840,7 +891,7 @@ public abstract class StackValue {
         }
 
         @Override
-        public int receiverSize() {
+        public int receiverSizeForWrite() {
             return 2;
         }
 
@@ -1052,7 +1103,7 @@ public abstract class StackValue {
         }
 
         @Override
-        public int receiverSize() {
+        public int receiverSizeForWrite() {
             if (isStandardStack(codegen.typeMapper, resolvedGetCall, 1) && isStandardStack(codegen.typeMapper, resolvedSetCall, 2)) {
                 return 2;
             }
@@ -1700,7 +1751,7 @@ public abstract class StackValue {
         }
 
         @Override
-        protected int receiverSize() {
+        protected int receiverSizeForWrite() {
             return receiver.type.getSize();
         }
 
