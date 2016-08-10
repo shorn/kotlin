@@ -3772,9 +3772,9 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
             }
         }
 
-        return StackValue.operation(asmBaseType, new Function1<InstructionAdapter, Unit>() {
+        return new StackValue(asmBaseType) {
             @Override
-            public Unit invoke(InstructionAdapter v) {
+            public void putSelector(@NotNull Type type, @NotNull InstructionAdapter v) {
                 StackValue value = gen(expression.getBaseExpression());
 
                 value.putReceiverForSeveralOperations(v, false, true);
@@ -3787,10 +3787,12 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
                 //
                 // NB: Beside optimization it's also necessary to help DEX generate valid code (we just repeat after javac)
                 // see KT-13098
-                boolean isThereValueBelowReceiver = value.dupSelectorBelowReceiverForWrite(asmBaseType, v);
+
+                boolean isThereNeedToStorePreviousValue =
+                        type.getSort() != Type.VOID && !value.dupSelectorBelowReceiverForWrite(asmBaseType, v);
 
                 StackValue previousValue = null;
-                if (!isThereValueBelowReceiver) {
+                if (isThereNeedToStorePreviousValue) {
                     AsmUtil.dup(v, asmBaseType);
                     previousValue = StackValue.local(myFrameMap.enterTemp(asmBaseType), asmBaseType);
                     previousValue.store(StackValue.onStack(asmBaseType), v);
@@ -3809,14 +3811,16 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
 
                 value.store(StackValue.onStack(storeType), v, true);
 
-                if (!isThereValueBelowReceiver) {
+                if (isThereNeedToStorePreviousValue) {
                     previousValue.put(asmBaseType, v);
                     myFrameMap.leaveTemp(asmBaseType);
                 }
 
-                return Unit.INSTANCE;
+                if (type.getSort() != Type.VOID) {
+                    coerce(asmBaseType, type, v);
+                }
             }
-        });
+        };
     }
 
     @Override
