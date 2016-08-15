@@ -41,10 +41,12 @@ import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.resolve.scopes.MemberScopeImpl
 import org.jetbrains.kotlin.storage.NotNullLazyValue
+import org.jetbrains.kotlin.storage.getValue
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.utils.Printer
 import org.jetbrains.kotlin.utils.addIfNotNull
+import org.jetbrains.kotlin.utils.alwaysTrue
 import org.jetbrains.kotlin.utils.toReadOnlyList
 import java.util.*
 
@@ -214,14 +216,23 @@ abstract class LazyJavaScope(protected val c: LazyJavaResolverContext) : MemberS
         return ResolvedValueParameters(descriptors, synthesizedNames)
     }
 
-    override fun getContributedFunctions(name: Name, location: LookupLocation): Collection<SimpleFunctionDescriptor> = functions(name)
+    override fun getContributedFunctions(name: Name, location: LookupLocation): Collection<SimpleFunctionDescriptor> {
+        if (name !in getFunctionNames()) return emptyList()
+        return functions(name)
+    }
 
-    protected open fun getFunctionNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name>
+    private val functionNamesLazy by c.storageManager.createLazyValue { computeFunctionNames(DescriptorKindFilter.ALL, alwaysTrue()) }
+    private val propertyNamesLazy by c.storageManager.createLazyValue { computePropertyNames(DescriptorKindFilter.ALL, alwaysTrue()) }
+
+    override fun getFunctionNames() = functionNamesLazy
+    override fun getPropertyNames() = propertyNamesLazy
+
+    protected open fun computeFunctionNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name>
             = memberIndex().getMethodNames(nameFilter)
 
     protected abstract fun computeNonDeclaredProperties(name: Name, result: MutableCollection<PropertyDescriptor>)
 
-    protected abstract fun getPropertyNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name>
+    protected abstract fun computePropertyNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name>
 
     private val properties = c.storageManager.createMemoizedFunction {
         name: Name ->
@@ -288,7 +299,10 @@ abstract class LazyJavaScope(protected val c: LazyJavaResolverContext) : MemberS
         return propertyType
     }
 
-    override fun getContributedVariables(name: Name, location: LookupLocation): Collection<PropertyDescriptor> = properties(name)
+    override fun getContributedVariables(name: Name, location: LookupLocation): Collection<PropertyDescriptor> {
+        if (name !in getPropertyNames()) return emptyList()
+        return properties(name)
+    }
 
     override fun getContributedDescriptors(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean) = allDescriptors()
 
@@ -309,7 +323,7 @@ abstract class LazyJavaScope(protected val c: LazyJavaResolverContext) : MemberS
         }
 
         if (kindFilter.acceptsKinds(DescriptorKindFilter.FUNCTIONS_MASK) && !kindFilter.excludes.contains(NonExtensions)) {
-            for (name in getFunctionNames(kindFilter, nameFilter)) {
+            for (name in computeFunctionNames(kindFilter, nameFilter)) {
                 if (nameFilter(name)) {
                     result.addAll(getContributedFunctions(name, location))
                 }
@@ -317,7 +331,7 @@ abstract class LazyJavaScope(protected val c: LazyJavaResolverContext) : MemberS
         }
 
         if (kindFilter.acceptsKinds(DescriptorKindFilter.VARIABLES_MASK) && !kindFilter.excludes.contains(NonExtensions)) {
-            for (name in getPropertyNames(kindFilter, nameFilter)) {
+            for (name in computePropertyNames(kindFilter, nameFilter)) {
                 if (nameFilter(name)) {
                     result.addAll(getContributedVariables(name, location))
                 }
