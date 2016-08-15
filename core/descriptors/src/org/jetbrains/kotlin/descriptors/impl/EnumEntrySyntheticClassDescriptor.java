@@ -288,6 +288,18 @@ public class EnumEntrySyntheticClassDescriptor extends ClassDescriptorBase {
             return result;
         }
 
+        @NotNull
+        @Override
+        public Collection<Name> getFunctionNames() {
+            return enumMemberNames.invoke();
+        }
+
+        @NotNull
+        @Override
+        public Collection<Name> getPropertyNames() {
+            return enumMemberNames.invoke();
+        }
+
         @Override
         public void printScopeStructure(@NotNull Printer p) {
             p.println("enum entry scope for " + EnumEntrySyntheticClassDescriptor.this);

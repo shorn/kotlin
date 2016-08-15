@@ -663,14 +663,11 @@ class LazyJavaClassMemberScope(
     override fun getClassNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name>
             = nestedClassIndex().keys + enumEntryIndex().keys
 
-    override fun getPropertyNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name> {
+    override fun computePropertyNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name> {
         if (jClass.isAnnotationType) return memberIndex().getMethodNames(nameFilter)
-
-        return memberIndex().getAllFieldNames() +
-               ownerDescriptor.getTypeConstructor().getSupertypes().flatMapTo(LinkedHashSet<Name>()) { supertype ->
-            supertype.memberScope.getContributedDescriptors(kindFilter, nameFilter).map { variable ->
-                variable.getName()
-            }
+        val result = LinkedHashSet(memberIndex().getAllFieldNames())
+        return ownerDescriptor.typeConstructor.supertypes.flatMapTo(result) { supertype ->
+            supertype.memberScope.getPropertyNames()
         }
     }
 
