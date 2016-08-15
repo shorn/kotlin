@@ -146,11 +146,11 @@ class LazyJavaPackageScope(
         }
     }
 
-    override fun getFunctionNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name> {
+    override fun computeFunctionNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name> {
         // optimization: only SAM-constructors may exist in java package
         if (kindFilter.excludes.contains(SamConstructorDescriptorKindExclude)) return listOf()
 
-        return super.getFunctionNames(kindFilter, nameFilter)
+        return super.computeFunctionNames(kindFilter, nameFilter)
     }
 
     override fun computeNonDeclaredFunctions(result: MutableCollection<SimpleFunctionDescriptor>, name: Name) {
@@ -159,7 +159,7 @@ class LazyJavaPackageScope(
         }?.let { result.add(it) }
     }
 
-    override fun getPropertyNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean) = listOf<Name>()
+    override fun computePropertyNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean) = listOf<Name>()
 
     // we don't use implementation from super which caches all descriptors and does not use filters
     override fun getContributedDescriptors(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<DeclarationDescriptor> {

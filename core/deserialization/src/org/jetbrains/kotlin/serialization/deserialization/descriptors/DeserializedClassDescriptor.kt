@@ -251,19 +251,19 @@ class DeserializedClassDescriptor(
             })
         }
 
-        override fun getNonDeclaredFunctionNames(location: LookupLocation): Set<Name> {
+        override fun getNonDeclaredFunctionNames(): Set<Name> {
             return classDescriptor.typeConstructor.supertypes.flatMapTo(LinkedHashSet()) {
-                it.memberScope.getContributedDescriptors().filterIsInstance<SimpleFunctionDescriptor>().map { it.name }
+                it.memberScope.getFunctionNames()
             } + c.components.additionalClassPartsProvider.getFunctionsNames(this@DeserializedClassDescriptor)
         }
 
-        override fun getNonDeclaredVariableNames(location: LookupLocation): Set<Name> {
+        override fun getNonDeclaredVariableNames(): Set<Name> {
             return classDescriptor.typeConstructor.supertypes.flatMapTo(LinkedHashSet()) {
-                it.memberScope.getContributedDescriptors().filterIsInstance<PropertyDescriptor>().map { it.name }
+                it.memberScope.getPropertyNames()
             }
         }
 
-        override fun getNonDeclaredTypeAliasNames(location: LookupLocation): Set<Name> {
+        override fun getNonDeclaredTypeAliasNames(): Set<Name> {
             return classDescriptor.typeConstructor.supertypes.flatMapTo(LinkedHashSet()) {
                 it.memberScope.getContributedDescriptors().filterIsInstance<TypeAliasDescriptor>().map { it.name }
             }

@@ -208,6 +208,18 @@ public class ErrorUtils {
 
         @NotNull
         @Override
+        public Collection<Name> getFunctionNames() {
+            return emptyList();
+        }
+
+        @NotNull
+        @Override
+        public Collection<Name> getPropertyNames() {
+            return emptyList();
+        }
+
+        @NotNull
+        @Override
         public Collection<DeclarationDescriptor> getContributedDescriptors(
                 @NotNull DescriptorKindFilter kindFilter, @NotNull Function1<? super Name, Boolean> nameFilter
         ) {
@@ -259,6 +271,18 @@ public class ErrorUtils {
         public Collection<DeclarationDescriptor> getContributedDescriptors(
                 @NotNull DescriptorKindFilter kindFilter, @NotNull Function1<? super Name, Boolean> nameFilter
         ) {
+            throw new IllegalStateException();
+        }
+
+        @NotNull
+        @Override
+        public Collection<Name> getFunctionNames() {
+            throw new IllegalStateException();
+        }
+
+        @NotNull
+        @Override
+        public Collection<Name> getPropertyNames() {
             throw new IllegalStateException();
         }
 

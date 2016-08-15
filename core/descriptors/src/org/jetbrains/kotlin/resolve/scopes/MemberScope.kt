@@ -28,6 +28,9 @@ interface MemberScope : ResolutionScope {
     override fun getContributedVariables(name: Name, location: LookupLocation): Collection<PropertyDescriptor>
     override fun getContributedFunctions(name: Name, location: LookupLocation): Collection<SimpleFunctionDescriptor>
 
+    fun getFunctionNames(): Collection<Name>
+    fun getPropertyNames(): Collection<Name>
+
     /**
      * Is supposed to be used in tests and debug only
      */
@@ -37,6 +40,9 @@ interface MemberScope : ResolutionScope {
         override fun printScopeStructure(p: Printer) {
             p.println("Empty member scope")
         }
+
+        override fun getFunctionNames() = emptyList<Name>()
+        override fun getPropertyNames() = emptyList<Name>()
     }
 
     companion object {

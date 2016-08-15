@@ -70,6 +70,9 @@ class JvmPackageScope(
     ): Collection<DeclarationDescriptor> =
             getFromAllScopes(javaScope, kotlinScopes) { it.getContributedDescriptors(kindFilter, nameFilter) }
 
+    override fun getFunctionNames() = getFromAllScopes(javaScope, kotlinScopes) { it.getFunctionNames() }
+    override fun getPropertyNames() = getFromAllScopes(javaScope, kotlinScopes) { it.getPropertyNames() }
+
     override fun printScopeStructure(p: Printer) {
         p.println(javaClass.simpleName, " {")
         p.pushIndent()
