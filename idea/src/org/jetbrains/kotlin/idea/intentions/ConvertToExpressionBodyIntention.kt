@@ -41,7 +41,7 @@ class ConvertToExpressionBodyIntention : SelfTargetingOffsetIndependentIntention
         )
     }
 
-    override fun allowCaretInsideElement(element: PsiElement) = element !is KtDeclaration
+    override fun allowCaretInsideElement(element: PsiElement) = element !is KtDeclaration && super.allowCaretInsideElement(element)
 
     override fun applyTo(element: KtDeclarationWithBody, editor: Editor?) {
         applyTo(element) {
