@@ -26,9 +26,122 @@ package org.jetbrains.kotlin.storage
 
  * @author Eric D. Friedman
  */
-open class MyTHashMap<in K : Any, V> : MyTObjectHash<K>() {
-    /** the values of the  map  */
-    protected lateinit var _values: Array<V>
+open class MyTHashMap<in K : Any, V> : MyTHash() {
+
+    protected lateinit var _entries: Array<Any?>
+
+    protected fun computeHashCode(o: Any) = o.hashCode()
+    protected fun computeEquals(o1: Any, o2: Any) = o1 == o2
+
+    override fun capacity() = _entries.keysCapacity
+
+    /**
+     * Searches the set for obj
+
+     * @param obj an `Object` value
+     * *
+     * @return a `boolean` value
+     */
+    open operator fun contains(obj: Any): Boolean {
+        return index(obj as K) >= 0
+    }
+
+    /**
+     * Locates the index of obj.
+
+     * @param obj an `Object` value
+     * *
+     * @return the index of obj or -1 if it isn't in the set.
+     */
+    protected fun index(obj: K): Int {
+        val set = _entries
+        val length = set.keysCapacity
+        val hash = computeHashCode(obj) and 0x7fffffff
+        var index = hash % length
+        var cur: Any? = set.getKey(index)
+
+        if (cur != null && !computeEquals(cur, obj)) {
+            // see Knuth, p. 529
+            val probe = 1 + hash % (length - 2)
+
+            do {
+                index -= probe
+                if (index < 0) {
+                    index += length
+                }
+                cur = set.getKey(index)
+            }
+            while (cur != null && !computeEquals(cur, obj))
+        }
+
+        return if (cur == null) -1 else index
+    }
+
+    /**
+     * Locates the index at which obj can be inserted.  if
+     * there is already a value equal()ing obj in the set,
+     * returns that value's index as -index - 1.
+
+     * @param obj an `Object` value
+     * *
+     * @return the index of a FREE slot at which obj can be inserted
+     * * or, if obj is already stored in the hash, the negative value of
+     * * that index, minus 1: -index -1.
+     */
+    protected fun insertionIndex(obj: K): Int {
+        val set = _entries
+        val length = set.keysCapacity
+        val hash = computeHashCode(obj) and 0x7fffffff
+        var index = hash % length
+        var cur: Any? = set.getKey(index) ?: return index       // empty, all done
+
+        if (computeEquals(cur!!, obj)) {
+            return -index - 1   // already stored
+        }
+
+        // already FULL or REMOVED, must probe
+        // compute the double hash
+        val probe = 1 + hash % (length - 2)
+
+        // starting at the natural offset, probe until we find an
+        // offset that isn't full.
+        do {
+            index -= probe
+            if (index < 0) {
+                index += length
+            }
+            cur = set.getKey(index)
+        }
+        while (cur != null && !computeEquals(cur, obj))
+
+        // if it's full, the key is already stored
+        if (cur != null) {
+            return -index - 1
+        }
+
+        return index
+    }
+
+    protected fun Array<Any?>.setKey(index: Int, k: Any) {
+        object {
+
+        }
+        this[index * 2] = k
+    }
+    protected fun Array<Any?>.setValue(index: Int, v: Any?) {
+        this[index * 2 + 1] = v
+    }
+
+    protected fun Array<Any?>.getKey(index: Int): Any? {
+        return this[index * 2]
+    }
+
+    protected fun Array<Any?>.getValue(index: Int): Any? {
+        return this[index * 2 + 1]
+    }
+
+    protected val Array<*>.keysCapacity: Int
+        get() = size / 2
 
     /**
      * initialize the value array of the map.
@@ -39,7 +152,7 @@ open class MyTHashMap<in K : Any, V> : MyTObjectHash<K>() {
      */
     override fun setUp(initialCapacity: Int): Int {
         val capacity = super.setUp(initialCapacity)
-        _values = arrayOfNulls<Any>(capacity) as Array<V>
+        _entries = arrayOfNulls<Any>(2 * capacity)
         return capacity
     }
 
@@ -62,11 +175,11 @@ open class MyTHashMap<in K : Any, V> : MyTObjectHash<K>() {
         val alreadyStored = index < 0
         if (alreadyStored) {
             index = -index - 1
-            previous = _values[index]
+            previous = _entries.getValue(index) as V?
         }
-        val oldKey = _set[index]
-        _set[index] = key
-        _values[index] = value
+        val oldKey = _entries.getKey(index)
+        _entries.setKey(index, key)
+        _entries.setValue(index, value)
         if (!alreadyStored) {
             postInsertHook(oldKey == null)
         }
@@ -79,25 +192,23 @@ open class MyTHashMap<in K : Any, V> : MyTObjectHash<K>() {
 
      * @param newCapacity an `int` value
      */
-    override fun rehash(newCapacity: Int) {
-        val oldCapacity = _set.size
-        val oldKeys = _set
-        val oldVals = _values
+   override fun rehash(newCapacity: Int) {
+       val oldCapacity = capacity()
+       val oldEntries = _entries
+       _entries = arrayOfNulls<Any>(newCapacity * 2)
+       val set = _entries
 
-        _set = arrayOfNulls<Any>(newCapacity)
-        _values = arrayOfNulls<Any>(newCapacity) as Array<V>
-
-        var i = oldCapacity
-        while (i-- > 0) {
-            if (oldKeys[i] != null) {
-                val o = oldKeys[i]
-                val index = insertionIndex(o as K)
-                assert(index >= 0)
-                _set[index] = o
-                _values[index] = oldVals[i]
-            }
-        }
-    }
+       var i = oldCapacity
+       while (i-- > 0) {
+           if (oldEntries.getKey(i) != null) {
+               val o = oldEntries.getKey(i)
+               val index = insertionIndex(o as K)
+               assert(index >= 0)
+               set.setKey(index, o)
+               set.setValue(index, oldEntries.getValue(i))
+           }
+       }
+   }
 
     /**
      * retrieves the value for key
@@ -108,7 +219,7 @@ open class MyTHashMap<in K : Any, V> : MyTObjectHash<K>() {
      */
     operator fun get(key: Any): V? {
         val index = index(key as K)
-        return if (index < 0) null else _values[index]
+        return if (index < 0) null else _entries.getValue(index) as V?
     }
 
 
