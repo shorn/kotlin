@@ -129,6 +129,7 @@ object MyPrimeFinder {
      * @return the capacity which should be used for a hashtable.
      */
     fun nextPrime(desiredCapacity: Int): Int {
+        if (desiredCapacity <= 1) return 1
         var i = Arrays.binarySearch(primeCapacities, desiredCapacity)
         if (i < 0) {
             // desired capacity not found, choose next prime greater

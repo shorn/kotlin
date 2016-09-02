@@ -154,7 +154,7 @@ abstract class MyTHash
         /**
          * the load above which rehashing occurs.
          */
-        protected val DEFAULT_LOAD_FACTOR = 0.8f
+        protected val DEFAULT_LOAD_FACTOR = 1f
 
         /** the default initial capacity for the hash table.  This is one
          * less than a prime value because one is added to it when
@@ -162,6 +162,6 @@ abstract class MyTHash
          * required by open addressing. Thus, the real default capacity is
          * 11.
          */
-        protected val DEFAULT_INITIAL_CAPACITY = 4
+        protected val DEFAULT_INITIAL_CAPACITY = 0
     }
 }
