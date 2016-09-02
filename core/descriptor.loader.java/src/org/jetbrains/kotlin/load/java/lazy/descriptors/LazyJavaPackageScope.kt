@@ -34,6 +34,8 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.storage.NullableLazyValue
+import org.jetbrains.kotlin.utils.alwaysTrue
+import java.util.*
 
 class LazyJavaPackageScope(
         c: LazyJavaResolverContext,
@@ -134,23 +136,26 @@ class LazyJavaPackageScope(
 
     override fun computeMemberIndex(): MemberIndex = object : MemberIndex by EMPTY_MEMBER_INDEX {
         // For SAM-constructors
-        override fun getMethodNames(nameFilter: (Name) -> Boolean): Set<Name> = getClassNames(DescriptorKindFilter.CLASSIFIERS, nameFilter)
+        override fun getMethodNames(): Set<Name> = getClassNames(DescriptorKindFilter.CLASSIFIERS)
     }
 
-    override fun getClassNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Set<Name> {
+    override fun getClassNames(kindFilter: DescriptorKindFilter): Set<Name> {
         // neither objects nor enum members can be in java package
         if (!kindFilter.acceptsKinds(DescriptorKindFilter.NON_SINGLETON_CLASSIFIERS_MASK)) return emptySet()
 
-        return jPackage.getClasses(nameFilter).mapNotNullTo(mutableSetOf()) { klass ->
+        val knownClassNamesInPackage = knownClassNamesInPackage()
+        if (knownClassNamesInPackage != null) return knownClassNamesInPackage.mapTo(HashSet()) { Name.identifier(it) }
+
+        return jPackage.getClasses(alwaysTrue()).mapNotNullTo(mutableSetOf()) { klass ->
             if (klass.lightClassOriginKind == LightClassOriginKind.SOURCE) null else klass.name
         }
     }
 
-    override fun computeFunctionNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Set<Name> {
+    override fun computeFunctionNames(kindFilter: DescriptorKindFilter): Set<Name> {
         // optimization: only SAM-constructors may exist in java package
         if (kindFilter.excludes.contains(SamConstructorDescriptorKindExclude)) return emptySet()
 
-        return super.computeFunctionNames(kindFilter, nameFilter)
+        return super.computeFunctionNames(kindFilter)
     }
 
     override fun computeNonDeclaredFunctions(result: MutableCollection<SimpleFunctionDescriptor>, name: Name) {

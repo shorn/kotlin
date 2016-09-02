@@ -42,26 +42,28 @@ class LazyJavaStaticClassScope(
     override fun computeMemberIndex(): MemberIndex {
         val delegate = ClassMemberIndex(jClass) { it.isStatic }
         return object : MemberIndex by delegate {
-            override fun getMethodNames(nameFilter: (Name) -> Boolean): Set<Name> {
+            override fun getMethodNames(): Set<Name> {
                 // Should be a super call, but KT-2860
-                return delegate.getMethodNames(nameFilter) +
+                return delegate.getMethodNames() +
                        // For SAM-constructors
                        jClass.innerClasses.map { it.name }
             }
         }
     }
 
-    override fun computeFunctionNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Set<Name> {
+    override fun computeFunctionNames(kindFilter: DescriptorKindFilter): Set<Name> {
+        val fromSuper = ownerDescriptor.getParentJavaStaticClassScope()?.getFunctionNames() ?: emptySet()
         if (jClass.isEnum) {
-            return super.computeFunctionNames(kindFilter, nameFilter) + listOf(DescriptorUtils.ENUM_VALUE_OF, DescriptorUtils.ENUM_VALUES)
+            return super.computeFunctionNames(kindFilter) + listOf(DescriptorUtils.ENUM_VALUE_OF, DescriptorUtils.ENUM_VALUES) + fromSuper
         }
-        return super.computeFunctionNames(kindFilter, nameFilter)
+
+        return super.computeFunctionNames(kindFilter) + fromSuper
     }
 
     override fun computePropertyNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Set<Name> =
             memberIndex().getAllFieldNames()
 
-    override fun getClassNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name> = listOf()
+    override fun getClassNames(kindFilter: DescriptorKindFilter): Collection<Name> = listOf()
 
     override fun getContributedClassifier(name: Name, location: LookupLocation): ClassifierDescriptor? {
         // We don't need to track lookups here because we find nested/inner classes in LazyJavaClassMemberScope
