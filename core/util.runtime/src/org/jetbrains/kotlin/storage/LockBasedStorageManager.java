@@ -26,7 +26,6 @@ import org.jetbrains.kotlin.utils.WrappedValues;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
@@ -356,9 +355,8 @@ public class LockBasedStorageManager implements StorageManager {
 
     private static class MapBasedMemoizedFunction<K, V> implements MemoizedFunctionToNullable<K, V> {
         private final LockBasedStorageManager storageManager;
-        private volatile Object cache = null;
+        private volatile MyTHashMap<K, Object> cache = null;
         private final Function1<? super K, ? extends V> compute;
-
         public MapBasedMemoizedFunction(
                 @NotNull LockBasedStorageManager storageManager,
                 @NotNull Function1<? super K, ? extends V> compute
@@ -370,15 +368,14 @@ public class LockBasedStorageManager implements StorageManager {
         @Override
         @Nullable
         public V invoke(K input) {
-            int hashCode = input.hashCode();
             Object value;
-            value = tryReadResult(input, this.cache, hashCode);
+            value = tryReadResult(input, this.cache);
 
             if (value != null && value != NotValue.COMPUTING) return WrappedValues.unescapeExceptionOrNull(value);
 
             storageManager.lock.lock();
             try {
-                value = tryReadResult(input, this.cache, hashCode);
+                value = tryReadResult(input, this.cache);
                 if (value == NotValue.COMPUTING) {
                     throw recursionDetected(input);
                 }
@@ -386,9 +383,9 @@ public class LockBasedStorageManager implements StorageManager {
 
                 AssertionError error = null;
                 try {
-                    putResult(input, hashCode, NotValue.COMPUTING);
+                    putResult(input, NotValue.COMPUTING);
                     V typedValue = compute.invoke(input);
-                    putResult(input, hashCode, WrappedValues.escapeNull(typedValue));
+                    putResult(input, WrappedValues.escapeNull(typedValue));
 
                     //// This code effectively asserts that oldValue is null
                     //// The trickery is here because below we catch all exceptions thrown here, and this is the only exception that shouldn't be stored
@@ -415,87 +412,21 @@ public class LockBasedStorageManager implements StorageManager {
             }
         }
 
-        private void putResult(K input, int hashCode, Object result) {
+        private void putResult(K input, Object result) {
             if (cache == null) {
-                cache = new Object[4];
+                cache = new MyTHashMap<K, Object>();
             }
 
-            Object localCache = cache;
-            l1: while (localCache instanceof Object[]) {
-                Object[] cacheArray = (Object[]) localCache;
-                int keysCount = cacheArray.length / 2;
-                int offset = offsetForHashKey(hashCode, keysCount);
-                if (cacheArray[offset] == null) {
-                    cacheArray[offset] = input;
-                    cacheArray[offset + 1] = result;
-                    // Volatile write
-                    this.cache = localCache;
-                    this.cache = cache;
-                    return;
-                }
-
-                int nextSize;
-                switch (keysCount * 2) {
-                    case 4: nextSize = 16; break;
-                    case 16: nextSize = 32; break;
-                    case 32: {
-                        ConcurrentMap<Object, Object> newMap = storageManager.buildNewMap();
-                        for (int i = 0; i < keysCount; i++) {
-                            if (cacheArray[2 * i] == null) continue;
-                            newMap.put(cacheArray[2 * i], cacheArray[2 * i + 1]);
-                        }
-                        localCache = newMap;
-                        cache = newMap;
-                        break l1;
-                    }
-                    default: throw new IllegalStateException("Unexpected size: " + (keysCount * 2));
-                }
-
-                Object[] newCache = new Object[nextSize];
-
-                int newKeysCount = nextSize / 2;
-                for (int i = 0; i < keysCount; i++) {
-                    if (cacheArray[2 * i] == null) continue;
-                    int tmpHashCode = cacheArray[2 * i].hashCode();
-                    newCache[offsetForHashKey(tmpHashCode, newKeysCount)] = cacheArray[2 * i];
-                    newCache[offsetForHashKey(tmpHashCode, newKeysCount) + 1] = cacheArray[2 * i + 1];
-                }
-
-                localCache = newCache;
-            }
-
-            assert localCache instanceof Map<?, ?> : "local cache here must be a Map";
-            ((Map) localCache).put(input, result);
-        }
-
-        private static int offsetForHashKey(int hashCode, int keysCount) {
-            return indexFor(hash(hashCode), keysCount) * 2;
-        }
-
-        // From JDK
-        private static int hash(int h) {
-            h ^= (h >>> 20) ^ (h >>> 12);
-            return h ^ (h >>> 7) ^ (h >>> 4);
-        }
-
-        private static int indexFor(int h, int length) {
-            return h & (length-1);
+            MyTHashMap<K, Object> map = this.cache;
+            map.put(input, result);
         }
 
         @Nullable
-        private static Object tryReadResult(Object input, Object localCache, int hashCode) {
-            Object value = null;
-            if (localCache instanceof Object[]) {
-                int keysCount = ((Object[]) localCache).length / 2;
-                int offset = offsetForHashKey(hashCode, keysCount);
-                if (((Object[]) localCache)[offset] != null && ((Object[]) localCache)[offset].equals(input)) {
-                    value = ((Object[]) localCache)[offset + 1];
-                }
+        private static Object tryReadResult(Object input, MyTHashMap localCache) {
+            if (localCache != null) {
+                return localCache.get(input);
             }
-            else if (localCache instanceof Map<?, ?>) {
-                value = ((Map) localCache).get(input);
-            }
-            return value;
+            return null;
         }
 
         @NotNull
