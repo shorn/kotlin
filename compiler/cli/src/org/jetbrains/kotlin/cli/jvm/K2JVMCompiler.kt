@@ -43,6 +43,7 @@ import org.jetbrains.kotlin.load.kotlin.incremental.components.IncrementalCompil
 import org.jetbrains.kotlin.script.KotlinScriptDefinitionFromTemplate
 import org.jetbrains.kotlin.script.StandardScriptDefinition
 import org.jetbrains.kotlin.util.PerformanceCounter
+import org.jetbrains.kotlin.util.PerformanceCounter2
 import org.jetbrains.kotlin.utils.KotlinPaths
 import org.jetbrains.kotlin.utils.KotlinPathsFromHomeDir
 import org.jetbrains.kotlin.utils.PathUtil
@@ -63,6 +64,7 @@ class K2JVMCompiler : CLICompiler<K2JVMCompilerArguments>() {
 
         messageCollector.report(CompilerMessageSeverity.LOGGING, "Using Kotlin home directory " + paths.homePath, CompilerMessageLocation.NO_LOCATION)
         PerformanceCounter.setTimeCounterEnabled(arguments.reportPerf)
+        PerformanceCounter2.setTimeCounterEnabled(arguments.reportPerf)
 
         setupJdkClasspathRoots(arguments, configuration, messageCollector).let {
             if (it != OK) return it
@@ -205,6 +207,7 @@ class K2JVMCompiler : CLICompiler<K2JVMCompilerArguments>() {
                 reportGCTime(configuration)
                 reportCompilationTime(configuration)
                 PerformanceCounter.report { s -> reportPerf(configuration, s) }
+                PerformanceCounter2.report { s -> reportPerf(configuration, s) }
             }
             return OK
         }
