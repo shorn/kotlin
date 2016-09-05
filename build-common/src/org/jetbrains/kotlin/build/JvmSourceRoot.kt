@@ -18,4 +18,5 @@ package org.jetbrains.kotlin.build
 
 import java.io.File
 
+
 data class JvmSourceRoot(val file: File, val packagePrefix: String? = null)
