@@ -16,33 +16,32 @@
 
 package org.jetbrains.kotlin.cli.jvm.compiler
 
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.io.JarUtil
-import org.jetbrains.annotations.TestOnly
 import com.intellij.psi.PsiManager
 import com.intellij.psi.impl.PsiModificationTrackerImpl
+import org.jetbrains.annotations.TestOnly
 import org.jetbrains.kotlin.analyzer.AnalysisResult
 import org.jetbrains.kotlin.asJava.FilteredJvmDiagnostics
 import org.jetbrains.kotlin.backend.common.output.OutputFileCollection
 import org.jetbrains.kotlin.backend.common.output.SimpleOutputFileCollection
+import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.common.messages.*
 import org.jetbrains.kotlin.cli.common.output.outputUtils.writeAll
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
-import org.jetbrains.kotlin.cli.jvm.config.addJavaSourceRoot
-import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoot
-import org.jetbrains.kotlin.cli.jvm.config.jvmClasspathRoots
+import org.jetbrains.kotlin.cli.jvm.config.*
 import org.jetbrains.kotlin.codegen.ClassBuilderFactories
 import org.jetbrains.kotlin.codegen.CompilationErrorHandler
 import org.jetbrains.kotlin.codegen.GeneratedClassLoader
 import org.jetbrains.kotlin.codegen.KotlinCodegenFacade
-import org.jetbrains.kotlin.cli.jvm.config.*
-import org.jetbrains.kotlin.codegen.*
 import org.jetbrains.kotlin.codegen.state.GenerationState
 import org.jetbrains.kotlin.codegen.state.GenerationStateEventCallback
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.config.addKotlinSourceRoots
+import org.jetbrains.kotlin.context.GlobalContext
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.idea.MainFunctionDetector
 import org.jetbrains.kotlin.load.kotlin.ModuleVisibilityManager
@@ -387,6 +386,25 @@ object KotlinToJVMBytecodeCompiler {
         return generate(environment, environment.configuration, result, environment.getSourceFiles(), null)
     }
 
+    val globalContext = GlobalContext()
+    var builtInsPerJdk = hashMapOf<String, KotlinBuiltIns>()
+
+    fun createBuiltIns(x: CompilerConfiguration, jdk: JvmClasspathRoot): KotlinBuiltIns {
+        x.info("New built-ins instance for $jdk")
+        val copy = x.copy()
+
+        copy.put(JVMConfigurationKeys.CONTENT_ROOTS, listOf(jdk))
+        copy.put(JVMConfigurationKeys.MODULES, emptyList())
+
+        val environment = KotlinCoreEnvironment.createForProduction(Disposer.newDisposable(), copy, emptyList())
+        val mutableModuleContext =
+                TopDownAnalyzerFacadeForJVM.createContextWithSealedModule(environment.project, environment.configuration, globalContext)
+        TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
+                mutableModuleContext, emptyList(), CliLightClassGenerationSupport.NoScopeRecordCliBindingTrace(), copy,
+                JvmPackagePartProvider(environment))
+        return mutableModuleContext.builtIns
+    }
+
     private fun analyze(environment: KotlinCoreEnvironment, targetDescription: String?): AnalysisResult? {
         val collector = environment.messageCollector
 
@@ -396,9 +414,23 @@ object KotlinToJVMBytecodeCompiler {
                 environment.getSourceFiles(), object : AnalyzerWithCompilerReport.Analyzer {
             override fun analyze(): AnalysisResult {
                 val sharedTrace = CliLightClassGenerationSupport.NoScopeRecordCliBindingTrace()
-                val moduleContext =
-                        TopDownAnalyzerFacadeForJVM.createContextWithSealedModule(environment.project, environment.configuration)
+                val jdk = environment.configuration.getList(JVMConfigurationKeys.CONTENT_ROOTS).firstOrNull {
+                    (it as? JvmClasspathRoot)?.file?.absolutePath?.endsWith("lib/rt.jar") == true
+                } as? JvmClasspathRoot
 
+                val moduleContext =
+                        if (jdk != null) {
+                            val absolutePath = jdk.file.absolutePath
+                            val b = builtInsPerJdk.getOrPut(absolutePath) { createBuiltIns(environment.configuration, jdk) }
+
+                            TopDownAnalyzerFacadeForJVM.createContextWithSealedModule(
+                                    environment.project, environment.configuration, globalContext, b)
+                        }
+                        else {
+                            environment.configuration.info("JDK was not found: " + environment.configuration.getList(JVMConfigurationKeys.CONTENT_ROOTS))
+                            TopDownAnalyzerFacadeForJVM.createContextWithSealedModule(
+                                    environment.project, environment.configuration, globalContext)
+                        }
                 return TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
                         moduleContext,
                         environment.getSourceFiles(),
@@ -431,6 +463,11 @@ object KotlinToJVMBytecodeCompiler {
             analysisResult
         else
             null
+    }
+
+    private fun CompilerConfiguration.info(message: String) {
+        val collector = getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
+        collector.report(CompilerMessageSeverity.INFO, "D: $message", CompilerMessageLocation.NO_LOCATION)
     }
 
     private fun generate(

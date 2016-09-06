@@ -45,6 +45,7 @@ import org.jetbrains.kotlin.storage.StorageManager
 import org.jetbrains.kotlin.storage.getValue
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.LazyWrappedType
+import org.jetbrains.kotlin.util.PerformanceCounter2
 import org.jetbrains.kotlin.utils.DFS
 import org.jetbrains.kotlin.utils.SmartSet
 import org.jetbrains.kotlin.utils.addToStdlib.check
@@ -137,12 +138,19 @@ open class JvmBuiltInsSettings(
                 it.getContributedDescriptors(DescriptorKindFilter.FUNCTIONS).filterIsInstance<SimpleFunctionDescriptor>()
             }.map(SimpleFunctionDescriptor::getName)
 
+    object Q {
+        val x = PerformanceCounter2.create("getAdditionalFunctions")
+    }
+
     private fun getAdditionalFunctions(
             classDescriptor: DeserializedClassDescriptor,
             functionsByScope: (MemberScope) -> Collection<SimpleFunctionDescriptor>
     ): Collection<SimpleFunctionDescriptor> {
-        val javaAnalogueDescriptor = classDescriptor.getJavaAnalogue() ?: return emptyList()
+        val lazyJavaClassDescriptor = classDescriptor.getJavaAnalogue() ?: return emptyList()
+        return Q.x.time { foo(classDescriptor, lazyJavaClassDescriptor, functionsByScope) }
+    }
 
+    private fun foo(classDescriptor: DeserializedClassDescriptor, javaAnalogueDescriptor: LazyJavaClassDescriptor, functionsByScope: (MemberScope) -> Collection<SimpleFunctionDescriptor>): List<SimpleFunctionDescriptor> {
         val kotlinClassDescriptors = j2kClassMap.mapPlatformClass(javaAnalogueDescriptor.fqNameSafe, FallbackBuiltIns.Instance)
         val kotlinMutableClassIfContainer = kotlinClassDescriptors.lastOrNull() ?: return emptyList()
         val kotlinVersions = SmartSet.create(kotlinClassDescriptors.map { it.fqNameSafe })
