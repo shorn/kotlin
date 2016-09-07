@@ -18,6 +18,8 @@
 
     <property name="plugin.zip" value="${artifact.output.path}/kotlin-plugin-${build.number}.zip"/>
 
+    <property name="bootstrap.build.no.tests" value="false"/>
+
     <macrodef name="echoprop">
         <attribute name="prop"/>
         <sequential>
@@ -95,7 +97,13 @@
         <delete dir="${version_substitute_dir}" quiet="true"/>
     </target>
 
-    <target name="pre_build" depends="writeVersionToTemplateFiles, cleanupArtifacts"/>
+    <target name="modifyBuildParameters">
+        <!-- don't run compiler tests -->
+        <echo message="##teamcity[setParameter name='idea.build.18.run.configurations' value='All Non Compiler Tests']"/>
+        <echo message="##teamcity[setParameter name='idea.build.16.run.configurations' value='']"/>
+    </target>
+
+    <target name="pre_build" depends="writeVersionToTemplateFiles, cleanupArtifacts, modifyBuildParameters"/>
 
     <target name="zipArtifacts">
         <macrodef name="zipPlugin">
@@ -147,7 +155,11 @@
         <print-file-size-statistic path="${js.stdlib.output.dir}" file-name="${compiled.stdlib.js}"/>
     </target>
 
-    <target name="post_build" depends="zipArtifacts, revertTemplateFiles, printStatistics, remove_internal_artifacts, dont_remove_internal_artifacts"/>
+    <target name="modifyBuildStatus" unless="bootstrap.build.no.tests">
+        <echo message="##teamcity[buildProblem description='No Dependencies' identity='no-dependencies']"/>
+    </target>
+
+    <target name="post_build" depends="zipArtifacts, revertTemplateFiles, printStatistics, remove_internal_artifacts, dont_remove_internal_artifacts, modifyBuildStatus"/>
 
     <target name="none">
         <fail message="Either specify pre_build or post_build"/>
