@@ -69,7 +69,7 @@ public class StdlibTest extends KotlinTestWithEnvironment {
 
     public void testStdlib() throws ClassNotFoundException {
         GenerationState state = KotlinToJVMBytecodeCompiler.INSTANCE.analyzeAndGenerate(
-                getEnvironment(), GenerationStateEventCallback.Companion.getDO_NOTHING());
+                getEnvironment(), null, GenerationStateEventCallback.Companion.getDO_NOTHING());
         if (state == null) {
             fail("There were compilation errors");
         }

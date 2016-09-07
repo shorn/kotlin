@@ -126,27 +126,7 @@ object KotlinToJVMBytecodeCompiler {
         }
 
         val targetDescription = "in targets [" + chunk.joinToString { input -> input.getModuleName() + "-" + input.getModuleType() } + "]"
-        var result = analyze(environment, targetDescription)
-        
-        if (result is AnalysisResult.RetryWithAdditionalJavaRoots) {
-            val oldReadOnlyValue = configuration.isReadOnly
-            configuration.isReadOnly = false
-            configuration.addJavaSourceRoots(result.additionalJavaRoots)
-            configuration.isReadOnly = oldReadOnlyValue
-
-            if (result.addToEnvironment) {
-                environment.addJavaSourceRoots(result.additionalJavaRoots.map { JavaSourceRoot(it, null) })
-            }
-
-            // Clear package caches (see KotlinJavaPsiFacade)
-            (PsiManager.getInstance(environment.project).modificationTracker as? PsiModificationTrackerImpl)?.incCounter()
-            
-            // Clear all diagnostic messages
-            configuration[CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY]?.clear()
-            
-            // Repeat analysis with additional Java roots (kapt generated sources)
-            result = analyze(environment, targetDescription)
-        }
+        val result = repeatAnalysisIfRequired(analyze(environment, targetDescription), configuration, environment, targetDescription)
         
         if (result == null || !result.shouldGenerateCode) return false
 
@@ -230,6 +210,7 @@ object KotlinToJVMBytecodeCompiler {
 
     fun compileBunchOfSources(
             environment: KotlinCoreEnvironment,
+            configuration: CompilerConfiguration,
             jar: File?,
             outputDir: File?,
             friendPaths: List<String>,
@@ -244,7 +225,7 @@ object KotlinToJVMBytecodeCompiler {
         if (!checkKotlinPackageUsage(environment, environment.getSourceFiles())) return false
 
         val onIndependentPartCompilationEnd = createOutputFilesFlushingCallbackIfPossible(environment.configuration, outputDir, jar)
-        val generationState = analyzeAndGenerate(environment, onIndependentPartCompilationEnd) ?: return false
+        val generationState = analyzeAndGenerate(environment, configuration, onIndependentPartCompilationEnd) ?: return false
 
         val mainClass = findMainClass(generationState, environment.getSourceFiles())
 
@@ -283,6 +264,35 @@ object KotlinToJVMBytecodeCompiler {
 
         return ExitCode.OK
     }
+    
+    private fun repeatAnalysisIfRequired(
+            result: AnalysisResult?, 
+            configuration: CompilerConfiguration?,
+            environment: KotlinCoreEnvironment,
+            targetDescription: String?
+    ): AnalysisResult? {
+        if (result is AnalysisResult.RetryWithAdditionalJavaRoots && configuration != null) {
+            val oldReadOnlyValue = configuration.isReadOnly
+            configuration.isReadOnly = false
+            configuration.addJavaSourceRoots(result.additionalJavaRoots)
+            configuration.isReadOnly = oldReadOnlyValue
+
+            if (result.addToEnvironment) {
+                environment.addJavaSourceRoots(result.additionalJavaRoots.map { JavaSourceRoot(it, null) })
+            }
+
+            // Clear package caches (see KotlinJavaPsiFacade)
+            (PsiManager.getInstance(environment.project).modificationTracker as? PsiModificationTrackerImpl)?.incCounter()
+
+            // Clear all diagnostic messages
+            configuration[CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY]?.clear()
+
+            // Repeat analysis with additional Java roots (kapt generated sources)
+            return analyze(environment, targetDescription)
+        }
+        
+        return result
+    }
 
     private fun reportExceptionFromScript(exception: Throwable) {
         // expecting InvocationTargetException from constructor invocation with cause that describes the actual cause
@@ -308,7 +318,7 @@ object KotlinToJVMBytecodeCompiler {
             paths: KotlinPaths,
             environment: KotlinCoreEnvironment
     ): Class<*>? {
-        val state = analyzeAndGenerate(environment, GenerationStateEventCallback.DO_NOTHING) ?: return null
+        val state = analyzeAndGenerate(environment, configuration, GenerationStateEventCallback.DO_NOTHING) ?: return null
 
         val classLoader: GeneratedClassLoader
         try {
@@ -326,9 +336,10 @@ object KotlinToJVMBytecodeCompiler {
 
     fun analyzeAndGenerate(
             environment: KotlinCoreEnvironment,
+            configuration: CompilerConfiguration?,
             onIndependentPartCompilationEnd: GenerationStateEventCallback
     ): GenerationState? {
-        val result = analyze(environment, null) ?: return null
+        val result = repeatAnalysisIfRequired(analyze(environment, null), configuration, environment, null) ?: return null
 
         if (!result.shouldGenerateCode) return null
 

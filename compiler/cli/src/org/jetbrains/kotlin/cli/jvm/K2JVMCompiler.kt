@@ -203,7 +203,8 @@ class K2JVMCompiler : CLICompiler<K2JVMCompilerArguments>() {
                     return COMPILATION_ERROR
                 }
 
-                KotlinToJVMBytecodeCompiler.compileBunchOfSources(environment, jar, outputDir, friendPaths, arguments.includeRuntime)
+                KotlinToJVMBytecodeCompiler.compileBunchOfSources(environment, configuration,
+                                                                  jar, outputDir, friendPaths, arguments.includeRuntime)
             }
 
             if (arguments.reportPerf) {
