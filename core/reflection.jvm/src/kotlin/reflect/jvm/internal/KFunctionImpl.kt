@@ -103,11 +103,7 @@ internal class KFunctionImpl private constructor(
         }
     }
 
-    override fun getArity(): Int {
-        return descriptor.valueParameters.size +
-               (if (descriptor.dispatchReceiverParameter != null) 1 else 0) +
-               (if (descriptor.extensionReceiverParameter != null) 1 else 0)
-    }
+    override fun getArity() = -1
 
     override val isInline: Boolean
         get() = descriptor.isInline
